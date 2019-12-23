@@ -7,6 +7,28 @@ typedef struct pixel
     unsigned char b;
 } pixel;
 
+typedef struct vec3
+{
+    int x;
+    int y;
+    int z;
+} vec3;
+
+float length(vec3 vector)
+{
+    return sqrt(vector.x * vector.x +
+                vector.y * vector.y +
+                vector.z * vector.z);
+}
+
+void normalize!(vec3 * vector)
+{
+    float len = length(vector);
+    vector.x /= len;
+    vector.y /= len;
+    vector.z /= len;
+}
+
 int main(void)
 {
     // Image data
@@ -22,7 +44,16 @@ int main(void)
         for(int y = 0; y < height; y++)
         {
             // Inside here its basically a fragment shader.
-            // Meaning it find a color for each pixel based on the pixel
+            // Meaning it needs a color for each pixel based on the pixel
+            // properties.
+            // We will make a ray for each pixel
+            vec3 rayDir
+            
+            
+            
+            
+            
+            
             // red
             data[y][x].r = ((x % 3) == 0) ? 0xff : 0x0;
             // green
