@@ -1,4 +1,13 @@
+// TODO: obj struct, dist function, constants (#defines: FOV, BIGNUM,
+// MAXDIST), add an actual object, add a bright color if it passes through
+// MAXDIST, etc...
+
+
+
 #include <stdio.h> 
+#include <math.h> 
+
+#define MAXDIST 1000
 
 typedef struct pixel
 {
@@ -14,6 +23,15 @@ typedef struct vec3
     int z;
 } vec3;
 
+vec3 mult(vec3 vec, float n)
+{
+    vec3 result;
+    result.x = vec.x * n;
+    result.y = vec.y * n;
+    result.z = vec.z * n;
+    return result;
+}
+
 float length(vec3 vector)
 {
     return sqrt(vector.x * vector.x +
@@ -21,12 +39,12 @@ float length(vec3 vector)
                 vector.z * vector.z);
 }
 
-void normalize!(vec3 * vector)
+void normalize(vec3 * vector)
 {
-    float len = length(vector);
-    vector.x /= len;
-    vector.y /= len;
-    vector.z /= len;
+    float len = length(*vector);
+    vector->x /= len;
+    vector->y /= len;
+    vector->z /= len;
 }
 
 int main(void)
@@ -38,22 +56,58 @@ int main(void)
     int maxcolor = 255 * sizeof(unsigned char);
     pixel data[height][width];
 
+    // Camera position. May or may not implement a moving camera.
+    vec3 campos = vec3
+                    {
+                        .x = 0,
+                        .y = 0,
+                        .z = 10
+                    };
+
+    // Top-left of the screen (where rays will be captured).
+    // Here is also defined the FOV.
+    vec3 tls = vec3
+                {
+                    .x =  float(width)  / 2,
+                    .y =  float(height) / 2,
+                    .z = (float(width)  / 2) / tan(FOV / 2)
+                };
+    tls = add(tls, campos);
+
+
     // Here we set the pixel color values
-    for(int x = 0; x < width; x++)
+    for(int y = 0; y < height; y++)
     {
-        for(int y = 0; y < height; y++)
+        for(int x = 0; x < width; x++)
         {
             // Inside here its basically a fragment shader.
             // Meaning it needs a color for each pixel based on the pixel
             // properties.
             // We will make a ray for each pixel
-            vec3 rayDir
-            
-            
-            
-            
-            
-            
+
+            // March
+
+            // The front face of our camera will point to the negative
+            // z axis.
+
+            vec3 pos = add(tls, add(x, y));
+            bool reached = false;
+            float distance = 0;
+            float prevmin = BIGNUM;
+            while (!reached && distance > MAXDIST)
+            {
+                for (int i = 0; i < objnum; i++)
+                {
+                    float d = dist(objs[i]);
+                    if (d < prevmin)
+                    {
+                        prevmin = d;
+                        data[y][x] = objs[i].color;
+                    }
+                }
+                pos = mult(
+            }
+
             // red
             data[y][x].r = ((x % 3) == 0) ? 0xff : 0x0;
             // green
