@@ -1,6 +1,5 @@
-// TODO: obj struct, dist function, constants (#defines: FOV, BIGNUM,
-// MAXDIST), add an actual object, add a bright color if it passes through
-// MAXDIST, etc...
+// TODO: solve bug in getting the color. Now any distance will already be
+// accepted;
 
 
 
@@ -8,6 +7,8 @@
 #include <math.h> 
 
 #define MAXDIST 1000
+#define FOV 1.5708
+#define BIGNUM 100
 
 typedef struct pixel
 {
@@ -23,6 +24,15 @@ typedef struct vec3
     int z;
 } vec3;
 
+
+typedef struct object
+{
+    enum {SPHERE} type;
+    vec3 pos;
+    float r; 
+    pixel color;
+} object;
+
 vec3 mult(vec3 vec, float n)
 {
     vec3 result;
@@ -30,6 +40,15 @@ vec3 mult(vec3 vec, float n)
     result.y = vec.y * n;
     result.z = vec.z * n;
     return result;
+}
+
+vec3 add(vec3 a, vec3 b)
+{
+    vec3 r;
+    r.x = a.x + b.x;
+    r.y = a.y + b.y;
+    r.z = a.z + b.z;
+    return r;
 }
 
 float length(vec3 vector)
@@ -47,17 +66,39 @@ void normalize(vec3 * vector)
     vector->z /= len;
 }
 
+float dist(object o, vec3 pos)
+{
+    float d;
+    switch(o.type)
+    {
+        case SPHERE:
+            d = sqrt(((pos.x - o.pos.x) * (pos.x - o.pos.x),
+                           (pos.y - o.pos.y) * (pos.y - o.pos.y),
+                           (pos.z - o.pos.z) * (pos.z - o.pos.z)));
+            d -= o.r;
+            break;
+        default:
+            printf("[-] dist() -> SPHERE");
+            d = -1;
+    }
+}
+
 int main(void)
 {
     // Image data
     FILE *img = fopen("out.ppm", "wb");
-    int width = 10;
-    int height = 10;
+    int width = 200;
+    int height = 200;
     int maxcolor = 255 * sizeof(unsigned char);
     pixel data[height][width];
+    object sphere = {.pos = {.x = 0.0, .y = 0.0, .z = 0.0},
+        .r = 1.0,
+        .color = {.r = 255, .g = 0, .b = 0}};
+    int objnum = 1;
+    object objs[] = {sphere};
 
     // Camera position. May or may not implement a moving camera.
-    vec3 campos = vec3
+    vec3 campos =
                     {
                         .x = 0,
                         .y = 0,
@@ -66,11 +107,11 @@ int main(void)
 
     // Top-left of the screen (where rays will be captured).
     // Here is also defined the FOV.
-    vec3 tls = vec3
+    vec3 tls =
                 {
-                    .x =  float(width)  / 2,
-                    .y =  float(height) / 2,
-                    .z = (float(width)  / 2) / tan(FOV / 2)
+                    .x =  ((float) width)  / 2,
+                    .y =  ((float) height) / 2,
+                    .z = (((float) width)  / 2) / tan(FOV / 2)
                 };
     tls = add(tls, campos);
 
@@ -89,31 +130,35 @@ int main(void)
 
             // The front face of our camera will point to the negative
             // z axis.
-
-            vec3 pos = add(tls, add(x, y));
-            bool reached = false;
+            vec3 pos2D = {.x = x, .y = y};
+            vec3 pos = add(tls, pos2D);
+            unsigned char reached = 0; // false
             float distance = 0;
             float prevmin = BIGNUM;
+            pixel final;
             while (!reached && distance > MAXDIST)
             {
+                distance = length(pos);
+                if (distance > MAXDIST)
+                {
+                    final.r = 255;
+                    final.g = 0;
+                    final.b = 127;
+
+                    break;
+                }
                 for (int i = 0; i < objnum; i++)
                 {
-                    float d = dist(objs[i]);
+                    float d = dist(objs[i], pos);
                     if (d < prevmin)
                     {
                         prevmin = d;
-                        data[y][x] = objs[i].color;
+                        final = objs[i].color;
                     }
                 }
-                pos = mult(
+                pos = add(pos, pos);
             }
-
-            // red
-            data[y][x].r = ((x % 3) == 0) ? 0xff : 0x0;
-            // green
-            data[y][x].g = ((x % 3) == 1) ? 0xff : 0x0;
-            // blue
-            data[y][x].b = ((x % 3) == 2) ? 0xff : 0x0;
+            data[y][x] = final;
         }
     }
 
