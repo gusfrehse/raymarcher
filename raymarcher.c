@@ -105,13 +105,13 @@ int main(void)
     FILE *img = fopen("out.ppm", "wb");
 
     //printf("[+] Initializing variables");
-    int width = 100;
-    int height = 100;
+    int width = 300;
+    int height = 300;
     int maxcolor = 255 * sizeof(unsigned char); // used for the image format.
     //printf(".");
     pixel data[height][width];
     object sphere = {
-                        .pos = {.x = 0.0, .y = 0.0, .z = -10.0},
+                        .pos = {.x = 15.0, .y = 15.0, .z = -5.0},
                         .r = 1.0,
                         .color = {.r = 0, .g = 255, .b = 0}
                     };
@@ -120,11 +120,11 @@ int main(void)
     //printf(".");
 
     // Camera position. May or may not implement a moving camera.
-    vec3 campos = {
-                      .x = 0,
-                      .y = 0,
-                      .z = 0
-                  };
+    // vec3 campos = {
+    //                   .x = 0,
+    //                   .y = 0,
+    //                   .z = 0
+    //               };
     // Factor is used to make the screen in the world space smaller, as it's
     // valid as long as it keeps the screen in the same aspect ratio.
     double factor = 8;
@@ -135,7 +135,6 @@ int main(void)
     //printf("[+] Calculating pixel values...");
 
     // Here we set the pixel color values
-    double minimal = 1000;
     for(int y = 0; y < height; y++)
     {
         for(int x = 0; x < width; x++)
@@ -152,64 +151,51 @@ int main(void)
             vec3 pos2D = {.x = x/factor, .y = y/factor, .z = 0.0};
             vec3 pos = add(bls, pos2D);
             vec3 step = mult(normalize(pos), 0.5);
-            printf("DEBUG:\nAt x: %d y: %d\nstep: x: %f y: %f z: %f\n", x, y, step.x, step.y, step.z);
             bool reached = false;
             double distance = 0;
             double prevmin = BIGNUM;
             pixel final;
-            // printf("DEBUG: start of while loop\n");
             double d;
             while (!reached)
             {
                 distance = length(pos);
-                // printf("x: %d,y: %d, distance: %d, md: %d\n", x, y, distance, MAXDIST);
+                // printf("x: %d,y: %d, distance: %f, md: %d\n", x, y, distance, MAXDIST);
                 // printf("Current pixel: x=%d, y=%d\nPOS: x=%f y=%f z=%f dist:%f\n",
                 //        x, y, pos.x, pos.y, pos.z, distance);
                 if (distance > MAXDIST)
                 {
                     // Did not encounter any object ("skybox" color).
-                    // (pink).
-                    final.r = 255;
+                    // (black).
+                    final.r = 0;
                     final.g = 0;
-                    final.b = 127;
+                    final.b = 0;
                     reached = true;
                 }
                 for (int i = 0; i < objnum; i++)
                 {
                     // Check the distance with each object.
                     d = dist(objs[i], pos);
-                    // printf("DEBUG: d:%f prevmin:%f i:%d\n", d, prevmin, i);
                     if (d < prevmin)
                     {
-                        // This if is DEBUG
-                        if(d < minimal)
-                        {
-                            minimal = d;
-                        }
-                        // printf("DEBUG: prevmin updatede\n");
                         if(d < MINDIST)
                         {
-                            printf("hit somethin\n");
+                            //printf("hit somethin\n");
                             // Ray hit the object.
                             final = objs[i].color;
                             reached = true;
                         }
                         prevmin = d;
                     }
-                    //printf("DEBUG: prevmin: %f\n", prevmin);
                 }
                 pos = add(pos, step);
-                // printf("DEBUG: x: %d y: %d\n", x, y);
-                // printf("DEBUG: minimal distance to obj: %f\n", d);
-                // printf("DEBUG: vector distance from ro: %f\n", distance);
             }
-            // printf("DEBUG: end of while loop\n");
             data[y][x] = final;
+            printf("Finished layer %d\n", y);
         }
     }
-    //printf(" Done!\n");
+    printf(" Done!\n");
 
-    //printf("[+] Writing data\n");
+    printf("[+] Writing data\n");
     // Magic number, width, height, maxcolor, data (rgbrgbrgb // format)
     fprintf(img, "P6\n%d\n%d\n%d\n", width, height, maxcolor);
     fwrite(data,
@@ -217,8 +203,7 @@ int main(void)
             sizeof(data) / sizeof(pixel),
             img);
     fclose(img);
-    //printf("DONE!\n");
-    printf("minimal distance to object: %f\n", minimal);
+    printf("DONE!\n");
     printf("expected fov: %f\n",atan((width / (2 * factor)) / bls.z));
     return 0;
 }
