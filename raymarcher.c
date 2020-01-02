@@ -1,14 +1,26 @@
-// TODO: solve bug in getting the color. Now any distance will already be
-// accepted;
+// TODO: Sphere is too small. Add other types of objects. Lighting? Maybe.
+
+// World coordinate scheme:
+//    +Y
+//    ^
+//    | screen plane is xy.
+//    |
+//    *----> +X
+//   /    
+//  /
+// L +Z
+
 
 
 
 #include <stdio.h> 
 #include <math.h> 
+#include <stdbool.h>
 
-#define MAXDIST 1000
+#define MAXDIST 500
+#define MINDIST 1.0
 #define FOV 1.5708
-#define BIGNUM 100
+#define BIGNUM 1000
 
 typedef struct pixel
 {
@@ -19,9 +31,9 @@ typedef struct pixel
 
 typedef struct vec3
 {
-    int x;
-    int y;
-    int z;
+    double x;
+    double y;
+    double z;
 } vec3;
 
 
@@ -29,11 +41,11 @@ typedef struct object
 {
     enum {SPHERE} type;
     vec3 pos;
-    float r; 
+    double r; 
     pixel color;
 } object;
 
-vec3 mult(vec3 vec, float n)
+vec3 mult(vec3 vec, double n)
 {
     vec3 result;
     result.x = vec.x * n;
@@ -51,72 +63,79 @@ vec3 add(vec3 a, vec3 b)
     return r;
 }
 
-float length(vec3 vector)
+double length(vec3 vector)
 {
     return sqrt(vector.x * vector.x +
                 vector.y * vector.y +
                 vector.z * vector.z);
 }
 
-void normalize(vec3 * vector)
+vec3 normalize(vec3 vector)
 {
-    float len = length(*vector);
-    vector->x /= len;
-    vector->y /= len;
-    vector->z /= len;
+    vec3 r;
+    double len = length(vector);
+    r.x = vector.x / len;
+    r.y = vector.y / len;
+    r.z = vector.z / len;
+    return r;
 }
 
-float dist(object o, vec3 pos)
+double dist(object o, vec3 pos)
 {
-    float d;
+    double d;
     switch(o.type)
     {
         case SPHERE:
-            d = sqrt(((pos.x - o.pos.x) * (pos.x - o.pos.x),
-                           (pos.y - o.pos.y) * (pos.y - o.pos.y),
-                           (pos.z - o.pos.z) * (pos.z - o.pos.z)));
+            d = sqrt((pos.x - o.pos.x) * (pos.x - o.pos.x) +
+                     (pos.y - o.pos.y) * (pos.y - o.pos.y) +
+                     (pos.z - o.pos.z) * (pos.z - o.pos.z));
             d -= o.r;
             break;
         default:
             printf("[-] dist() -> SPHERE");
             d = -1;
     }
+    return d;
 }
 
 int main(void)
 {
+    //printf("[+] Opening for write file out.ppm.\n");
     // Image data
     FILE *img = fopen("out.ppm", "wb");
-    int width = 200;
-    int height = 200;
-    int maxcolor = 255 * sizeof(unsigned char);
+
+    //printf("[+] Initializing variables");
+    int width = 100;
+    int height = 100;
+    int maxcolor = 255 * sizeof(unsigned char); // used for the image format.
+    //printf(".");
     pixel data[height][width];
-    object sphere = {.pos = {.x = 0.0, .y = 0.0, .z = 0.0},
-        .r = 1.0,
-        .color = {.r = 255, .g = 0, .b = 0}};
+    object sphere = {
+                        .pos = {.x = 0.0, .y = 0.0, .z = -10.0},
+                        .r = 1.0,
+                        .color = {.r = 0, .g = 255, .b = 0}
+                    };
     int objnum = 1;
     object objs[] = {sphere};
+    //printf(".");
 
     // Camera position. May or may not implement a moving camera.
-    vec3 campos =
-                    {
-                        .x = 0,
-                        .y = 0,
-                        .z = 10
-                    };
-
-    // Top-left of the screen (where rays will be captured).
-    // Here is also defined the FOV.
-    vec3 tls =
-                {
-                    .x =  ((float) width)  / 2,
-                    .y =  ((float) height) / 2,
-                    .z = (((float) width)  / 2) / tan(FOV / 2)
-                };
-    tls = add(tls, campos);
-
+    vec3 campos = {
+                      .x = 0,
+                      .y = 0,
+                      .z = 0
+                  };
+    // Factor is used to make the screen in the world space smaller, as it's
+    // valid as long as it keeps the screen in the same aspect ratio.
+    double factor = 8;
+    // Bottom-left-screen vector + x + y = world space pixel position.
+    vec3 bls = {.x = -width/(factor * 2), .y = -height/(factor * 2), .z = -1};
+    // bls = add(bls, campos);
+    //printf(" Done!\n");
+    //printf("[+] Calculating pixel values...");
 
     // Here we set the pixel color values
+    double minimal = 1000;
     for(int y = 0; y < height; y++)
     {
         for(int x = 0; x < width; x++)
@@ -130,38 +149,67 @@ int main(void)
 
             // The front face of our camera will point to the negative
             // z axis.
-            vec3 pos2D = {.x = x, .y = y};
-            vec3 pos = add(tls, pos2D);
-            unsigned char reached = 0; // false
-            float distance = 0;
-            float prevmin = BIGNUM;
+            vec3 pos2D = {.x = x/factor, .y = y/factor, .z = 0.0};
+            vec3 pos = add(bls, pos2D);
+            vec3 step = mult(normalize(pos), 0.5);
+            printf("DEBUG:\nAt x: %d y: %d\nstep: x: %f y: %f z: %f\n", x, y, step.x, step.y, step.z);
+            bool reached = false;
+            double distance = 0;
+            double prevmin = BIGNUM;
             pixel final;
-            while (!reached && distance > MAXDIST)
+            // printf("DEBUG: start of while loop\n");
+            double d;
+            while (!reached)
             {
                 distance = length(pos);
+                // printf("x: %d,y: %d, distance: %d, md: %d\n", x, y, distance, MAXDIST);
+                // printf("Current pixel: x=%d, y=%d\nPOS: x=%f y=%f z=%f dist:%f\n",
+                //        x, y, pos.x, pos.y, pos.z, distance);
                 if (distance > MAXDIST)
                 {
+                    // Did not encounter any object ("skybox" color).
+                    // (pink).
                     final.r = 255;
                     final.g = 0;
                     final.b = 127;
-
-                    break;
+                    reached = true;
                 }
                 for (int i = 0; i < objnum; i++)
                 {
-                    float d = dist(objs[i], pos);
+                    // Check the distance with each object.
+                    d = dist(objs[i], pos);
+                    // printf("DEBUG: d:%f prevmin:%f i:%d\n", d, prevmin, i);
                     if (d < prevmin)
                     {
+                        // This if is DEBUG
+                        if(d < minimal)
+                        {
+                            minimal = d;
+                        }
+                        // printf("DEBUG: prevmin updatede\n");
+                        if(d < MINDIST)
+                        {
+                            printf("hit somethin\n");
+                            // Ray hit the object.
+                            final = objs[i].color;
+                            reached = true;
+                        }
                         prevmin = d;
-                        final = objs[i].color;
                     }
+                    //printf("DEBUG: prevmin: %f\n", prevmin);
                 }
-                pos = add(pos, pos);
+                pos = add(pos, step);
+                // printf("DEBUG: x: %d y: %d\n", x, y);
+                // printf("DEBUG: minimal distance to obj: %f\n", d);
+                // printf("DEBUG: vector distance from ro: %f\n", distance);
             }
+            // printf("DEBUG: end of while loop\n");
             data[y][x] = final;
         }
     }
+    //printf(" Done!\n");
 
+    //printf("[+] Writing data\n");
     // Magic number, width, height, maxcolor, data (rgbrgbrgb // format)
     fprintf(img, "P6\n%d\n%d\n%d\n", width, height, maxcolor);
     fwrite(data,
@@ -169,5 +217,8 @@ int main(void)
             sizeof(data) / sizeof(pixel),
             img);
     fclose(img);
+    //printf("DONE!\n");
+    printf("minimal distance to object: %f\n", minimal);
+    printf("expected fov: %f\n",atan((width / (2 * factor)) / bls.z));
     return 0;
 }
